@@ -3,6 +3,7 @@ Handlebars.registerHelper('easyform', function (attrs) {
       col = hash.col,
       data = hash.data,
       type = hash.type,
+      options = hash.options,
       tmpl;
 
   if (_.isString(col)) {
@@ -15,7 +16,7 @@ Handlebars.registerHelper('easyform', function (attrs) {
     console.log(col, data, type);
     throw new Error(
       "incorrect arguments to easyform. " +
-      "usage: {{ easyform col=\"MyCollection\" data=this type=\"update\" }}"
+      "usage: {{ easyform col=\"MyCollection\" data=this type=\"update\" options=myOptionsHelper }}"
     );
   }
 
@@ -32,7 +33,8 @@ Handlebars.registerHelper('easyform', function (attrs) {
     tmpl({
       id: Random.id(),
       col: col,
-      data: data
+      data: data,
+      options: options
     })
   );
 });
@@ -42,11 +44,13 @@ Template.easyFormUpdate.rendered = function () {
       data = self.data.data,
       col = self.data.col,
       schema = col.schema,
+      options = self.data.options || {},
       sel = '#' + self.data.id;
 
   $(sel + ' form').alpaca({
     data: data,
     schema: schema,
+    options: options,
     postRender: function (renderedForm) {
       $(sel + ' button[type="submit"]').click(function () {
         if (renderedForm.isValid(true)) {
@@ -57,5 +61,26 @@ Template.easyFormUpdate.rendered = function () {
         }
       });
     }
+  });
+};
+
+Template.easyFormInsert.rendered = function () {
+  var self = this,
+      col = self.data.col,
+      schema = col.schema,
+      options = self.data.options || {},
+      sel = '#' + self.data.id;
+
+  $(sel + ' form').alpaca({
+    schema: schema,
+    options: options,
+    postRender: function (renderedForm) {
+      $(sel + ' button[type="submit"]').click(function () {
+        if (renderedForm.isValid(true)) {
+          var val = renderedForm.getValue();
+          col.insert(val);
+        }
+      });
+    },
   });
 };
