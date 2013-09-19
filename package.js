@@ -11,4 +11,5 @@ Package.on_use(function (api) {
   api.use('alpaca', 'client');
   api.add_files('client.html', 'client');
   api.add_files('client.js', 'client');
+  api.export && api.export('EasyForm');
 });

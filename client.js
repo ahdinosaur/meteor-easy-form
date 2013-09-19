@@ -1,19 +1,16 @@
-Handlebars.registerHelper('easyform', function (attrs) {
+EasyForm = {}
+EasyForm.helper = function (attrs) {
   var hash = attrs.hash,
-      col = hash.col,
-      data = hash.data,
-      type = hash.type,
-      options = hash.options,
       tmpl;
 
-  if (_.isString(col)) {
-    col = window[col];
+  if (_.isString(hash.col)) {
+    hash.col = window[hash.col];
   }
 
-  if (!(( _.isObject(col)) && 
-        ( _.isObject(data)) &&
-        ( _.isString(type)))) {
-    console.log(col, data, type);
+  if (!(( _.isObject(hash.col)) && 
+        ( _.isObject(hash.data)) &&
+        ( _.isString(hash.type)))) {
+    console.log(hash.col, hash.data, hash.type);
     throw new Error(
       "incorrect arguments to easyform. " +
       "usage: {{ easyform col=\"MyCollection\" data=this type=\"update\" options=myOptionsHelper }}"
@@ -21,66 +18,76 @@ Handlebars.registerHelper('easyform', function (attrs) {
   }
 
 
-  if (type === 'update') {
+  if (hash.type === 'update') {
     tmpl = Template.easyFormUpdate;
-  } else if (type === 'insert') {
+  } else if (hash.type === 'insert') {
     tmpl = Template.easyFormInsert;
   } else {
-    throw new Error("incorrect type of easyform");
+    throw new Error("incorrect hash.type of easyform");
   }
 
   return new Handlebars.SafeString(
-    tmpl({
+    tmpl(_.extend(hash, {
       id: Random.id(),
-      col: col,
-      data: data,
-      options: options
-    })
+    }))
   );
-});
+};
 
-Template.easyFormUpdate.rendered = function () {
-  var self = this,
-      data = self.data.data,
-      col = self.data.col,
-      schema = col.schema,
-      options = self.data.options || {},
-      sel = '#' + self.data.id;
+Handlebars.registerHelper('easyform', EasyForm.helper);
 
-  $(sel + ' form').alpaca({
-    data: data,
-    schema: schema,
-    options: options,
-    postRender: function (renderedForm) {
-      $(sel + ' button[type="submit"]').click(function () {
-        if (renderedForm.isValid(true)) {
-          var val = renderedForm.getValue();
-          col.update({ _id: data._id }, {
-            $set: val
-          });
+var formTemplateRendered = function (type) {
+  return function () {
+    var self = this,
+        data = self.data.data,
+        col = self.data.col,
+        schema = col.schema,
+        options = self.data.options || {},
+        sel = '#' + self.data.id,
+        dbAction, alpacaType;
+
+    options.renderForm = true;
+    options.form = {
+      buttons: {
+        submit: {
+          value: type
         }
-      });
+      }
+    };
+
+    if (type === 'update') {
+      dbAction = function (val) {
+        col.update({ _id: data._id }, {
+          $set: val
+        });
+      };
+      alpacaType = "edit";
+    } else if (type === 'insert') {
+      dbAction = function (val) {
+        col.insert(val);
+      };
+      alpacaType = "create";
+    } else {
+      new Error('incorrect type to formTemplateRendered');
     }
-  });
+
+    $(sel).alpaca({
+      data: data,
+      schema: schema,
+      options: options,
+      postRender: function (renderedForm) {
+        $(sel + ' button[type="submit"]').click(function (e) {
+          e.preventDefault();
+          if (renderedForm.isValid(true)) {
+            var val = renderedForm.getValue();
+            dbAction(val);
+          }
+        });
+      },
+      ui: EasyForm.ui,
+      type: alpacaType
+    });
+  };
 };
 
-Template.easyFormInsert.rendered = function () {
-  var self = this,
-      col = self.data.col,
-      schema = col.schema,
-      options = self.data.options || {},
-      sel = '#' + self.data.id;
-
-  $(sel + ' form').alpaca({
-    schema: schema,
-    options: options,
-    postRender: function (renderedForm) {
-      $(sel + ' button[type="submit"]').click(function () {
-        if (renderedForm.isValid(true)) {
-          var val = renderedForm.getValue();
-          col.insert(val);
-        }
-      });
-    },
-  });
-};
+Template.easyFormUpdate.rendered = formTemplateRendered('update');
+Template.easyFormInsert.rendered = formTemplateRendered('insert');
