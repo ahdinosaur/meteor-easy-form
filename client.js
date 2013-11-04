@@ -8,7 +8,6 @@ EasyForm.helper = function (attrs) {
   }
 
   if (!(( _.isObject(hash.col)) && 
-        ( _.isObject(hash.data)) &&
         ( _.isString(hash.type)))) {
     console.log(hash.col, hash.data, hash.type);
     throw new Error(
@@ -17,25 +16,21 @@ EasyForm.helper = function (attrs) {
     );
   }
 
-
-  if (hash.type === 'update') {
-    tmpl = Template.easyFormUpdate;
-  } else if (hash.type === 'insert') {
-    tmpl = Template.easyFormInsert;
-  } else {
+  if (!_.has(EasyForm, hash.type)) {
     throw new Error("incorrect hash.type of easyform");
   }
+  var tmpl = EasyForm[hash.type];
 
   return new Handlebars.SafeString(
     tmpl(_.extend(hash, {
-      id: Random.id(),
+      id: Random.id()
     }))
   );
 };
 
 Handlebars.registerHelper('easyform', EasyForm.helper);
 
-var formTemplateRendered = function (type) {
+EasyForm.formTemplateRendered = function (type, fun) {
   return function () {
     var self = this,
         data = self.data.data,
@@ -44,6 +39,8 @@ var formTemplateRendered = function (type) {
         options = self.data.options || {},
         sel = '#' + self.data.id,
         dbAction, alpacaType;
+
+    fun = fun || function (c) { return c(); },
 
     options.renderForm = true;
     options.form = {
@@ -77,10 +74,12 @@ var formTemplateRendered = function (type) {
       postRender: function (renderedForm) {
         $(sel + ' button[type="submit"]').click(function (e) {
           e.preventDefault();
-          if (renderedForm.isValid(true)) {
-            var val = renderedForm.getValue();
-            dbAction(val);
-          }
+          return fun(function () {
+            if (renderedForm.isValid(true)) {
+              var val = renderedForm.getValue();
+              return dbAction(val);
+            }
+          });
         });
       },
       ui: EasyForm.ui,
@@ -89,5 +88,8 @@ var formTemplateRendered = function (type) {
   };
 };
 
-Template.easyFormUpdate.rendered = formTemplateRendered('update');
-Template.easyFormInsert.rendered = formTemplateRendered('insert');
+Template.easyFormUpdate.rendered = EasyForm.formTemplateRendered('update');
+Template.easyFormInsert.rendered = EasyForm.formTemplateRendered('insert');
+
+EasyForm.update = Template.easyFormUpdate;
+EasyForm.insert = Template.easyFormInsert;
